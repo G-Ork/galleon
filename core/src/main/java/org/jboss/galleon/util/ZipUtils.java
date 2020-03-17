@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2019 Red Hat, Inc. and/or its affiliates
+ * Copyright 2016-2020 Red Hat, Inc. and/or its affiliates
  * and other contributors as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -149,6 +149,6 @@ public class ZipUtils {
      * @throws IOException  in case of a failure
      */
      public static FileSystem newFileSystem(Path path) throws IOException {
-         return FileSystems.newFileSystem(path, null);
+         return FileSystems.newFileSystem(path, (ClassLoader)null);
      }
 }

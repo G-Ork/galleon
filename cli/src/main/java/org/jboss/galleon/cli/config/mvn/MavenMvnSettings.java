@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2019 Red Hat, Inc. and/or its affiliates
+ * Copyright 2016-2020 Red Hat, Inc. and/or its affiliates
  * and other contributors as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+
 import org.apache.maven.settings.Mirror;
 import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Proxy;
@@ -42,6 +43,12 @@ import org.apache.maven.settings.building.DefaultSettingsBuildingRequest;
 import org.apache.maven.settings.building.SettingsBuildingException;
 import org.apache.maven.settings.building.SettingsBuildingRequest;
 import org.apache.maven.settings.building.SettingsBuildingResult;
+import org.apache.maven.settings.crypto.DefaultSettingsDecryptionRequest;
+import org.apache.maven.settings.crypto.SettingsDecrypter;
+import org.apache.maven.settings.crypto.SettingsDecryptionResult;
+import org.codehaus.plexus.PlexusContainer;
+import org.codehaus.plexus.PlexusContainerException;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.eclipse.aether.RepositoryListener;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -61,6 +68,7 @@ class MavenMvnSettings implements MavenSettings {
     private static final String EXTERNAL = "external:";
     private static final String ALL = "*";
     private static final String NOT = "!";
+    private static final String LOG_WARN_DECRYPT = "Error decrypting maven settings.";
     private final List<RemoteRepository> repositories;
     private final RepositorySystemSession session;
     private final MavenConfig config;
@@ -121,7 +129,31 @@ class MavenMvnSettings implements MavenSettings {
             throw new ArtifactException(ex.getLocalizedMessage());
         }
 
-        return settingsBuildingResult.getEffectiveSettings();
+        final Settings cryptedSettings = settingsBuildingResult.getEffectiveSettings();
+
+        // Decrypt if neccessary
+        if( false == (cryptedSettings.getProxies().isEmpty() &&  cryptedSettings.getServers().isEmpty())) {
+            try {
+                // Init Maven iOC
+                final PlexusContainer plexusContainer = Util.createPlexusContainer();
+                final SettingsDecrypter settingsDecrypter = plexusContainer.lookup(SettingsDecrypter.class);
+
+                // Decrypt
+                DefaultSettingsDecryptionRequest decrypt = new DefaultSettingsDecryptionRequest();
+                decrypt.setProxies( cryptedSettings.getProxies() );
+                decrypt.setServers( cryptedSettings.getServers() );
+                SettingsDecryptionResult decrypted = settingsDecrypter.decrypt( decrypt );
+
+                // Update Settings
+                cryptedSettings.setProxies( decrypted.getProxies() );
+                cryptedSettings.setServers( decrypted.getServers() );
+            } catch (final PlexusContainerException exception) {
+                CliLogging.log.warn(LOG_WARN_DECRYPT, exception);
+            } catch (final ComponentLookupException exception) {
+                CliLogging.log.warn(LOG_WARN_DECRYPT, exception);
+            }
+        }
+        return cryptedSettings;
     }
 
     private List<RemoteRepository> buildRemoteRepositories(Settings settings) throws ArtifactException, MalformedURLException {

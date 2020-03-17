@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2019 Red Hat, Inc. and/or its affiliates
+ * Copyright 2016-2020 Red Hat, Inc. and/or its affiliates
  * and other contributors as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,7 @@ package org.jboss.galleon.cli.config.mvn;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import org.eclipse.aether.RepositorySystem;
@@ -30,12 +31,14 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
+import org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher;
 
 /**
  *
  * @author jdenise@redhat.com
  */
 public class MvnSettingsTestCase {
+
 
     @Test
     public void test() throws Exception {
@@ -164,44 +167,61 @@ public class MvnSettingsTestCase {
 
     @Test
     public void testMirrorAll() throws Exception {
-        RepositorySystem system = Util.newRepositorySystem();
-        MavenConfig config = new MavenConfig();
-        InputStream stream = MvnSettingsTestCase.class.getClassLoader().
-                getResourceAsStream("settings_cli_test_mirror_all.xml");
-        File tmp = File.createTempFile("cli_mvn_test", null);
-        tmp.deleteOnExit();
-        Files.copy(stream, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        config.setSettings(tmp.toPath());
-        MavenMvnSettings settings = new MavenMvnSettings(config, system, null);
-        assertEquals(4, settings.getRepositories().size());
 
-        boolean seenMirror = false;
-        for (RemoteRepository remote : settings.getRepositories()) {
-            if (remote.getId().equals("mirror1")) {
-                assertTrue(remote.getUrl().equals("http://mirror1"));
-                seenMirror = true;
-                assertEquals(remote.getMirroredRepositories().size(), 3);
-                boolean seen1 = false;
-                boolean seen2 = false;
-                boolean seen3 = false;
-                for (RemoteRepository mirrored : remote.getMirroredRepositories()) {
-                    if (mirrored.getId().equals("repo1")) {
-                        seen1 = true;
-                        assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo1"));
+        try {
+            // Init Security
+            URL resource = MvnSettingsTestCase.class.getClassLoader().
+            getResource("settings-security.xml");
+            System.setProperty(DefaultSecDispatcher.SYSTEM_PROPERTY_SEC_LOCATION, new File(resource.toURI()).getAbsolutePath());
+
+            // start test
+            RepositorySystem system = Util.newRepositorySystem();
+            MavenConfig config = new MavenConfig();
+            InputStream stream = MvnSettingsTestCase.class.getClassLoader().
+                    getResourceAsStream("settings_cli_test_mirror_all.xml");
+            File tmp = File.createTempFile("cli_mvn_test", null);
+            tmp.deleteOnExit();
+            Files.copy(stream, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            config.setSettings(tmp.toPath());
+            MavenMvnSettings settings = new MavenMvnSettings(config, system, null);
+            assertEquals(4, settings.getRepositories().size());
+
+            boolean seenMirror = false;
+            for (RemoteRepository remote : settings.getRepositories()) {
+                if (remote.getId().equals("mirror1")) {
+                    assertTrue(remote.getUrl().equals("http://mirror1"));
+                    seenMirror = true;
+                    assertEquals(remote.getMirroredRepositories().size(), 3);
+                    boolean seen1 = false;
+                    boolean seen2 = false;
+                    boolean seen3 = false;
+                    for (RemoteRepository mirrored : remote.getMirroredRepositories()) {
+                        if (mirrored.getId().equals("repo1")) {
+                            seen1 = true;
+                            assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo1"));
+                        }
+                        if (mirrored.getId().equals("repo2")) {
+                            seen2 = true;
+                            assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo2"));
+                        }
+                        if (mirrored.getId().equals("repo3")) {
+                            seen3 = true;
+                            assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo3"));
+
+                            /*
+                             * API do not let check PWD easy. To do it indirect by hash
+                             * PWD should be: dystopolis.
+                             */
+                        }
                     }
-                    if (mirrored.getId().equals("repo2")) {
-                        seen2 = true;
-                        assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo2"));
-                    }
-                    if (mirrored.getId().equals("repo3")) {
-                        seen3 = true;
-                        assertTrue(mirrored.getUrl(), mirrored.getUrl().equals("http://repo3"));
-                    }
+                    assertTrue(seen1 && seen2 && seen3);
                 }
-                assertTrue(seen1 && seen2 && seen3);
             }
+            assertTrue(seenMirror);
+
+        } finally {
+            System.getProperties().remove(DefaultSecDispatcher.SYSTEM_PROPERTY_SEC_LOCATION);
         }
-        assertTrue(seenMirror);
     }
 
     @Test

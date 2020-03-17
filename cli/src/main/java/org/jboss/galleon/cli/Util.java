@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2019 Red Hat, Inc. and/or its affiliates
+ * Copyright 2016-2020 Red Hat, Inc. and/or its affiliates
  * and other contributors as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,12 +22,25 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 import org.aesh.command.impl.converter.FileConverter;
 import org.aesh.readline.AeshContext;
 import org.aesh.readline.util.Parser;
-
+import org.apache.maven.extension.internal.CoreExports;
+import org.apache.maven.extension.internal.CoreExtensionEntry;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
+import org.codehaus.plexus.ContainerConfiguration;
+import org.codehaus.plexus.DefaultContainerConfiguration;
+import org.codehaus.plexus.DefaultPlexusContainer;
+import org.codehaus.plexus.PlexusConstants;
+import org.codehaus.plexus.PlexusContainer;
+import org.codehaus.plexus.PlexusContainerException;
+import org.codehaus.plexus.classworlds.ClassWorld;
+import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositoryListener;
 import org.eclipse.aether.RepositorySystem;
@@ -43,7 +56,10 @@ import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.jboss.galleon.Errors;
 import org.jboss.galleon.ProvisioningException;
 import org.jboss.galleon.util.PathsUtils;
+import org.slf4j.ILoggerFactory;
+import org.slf4j.LoggerFactory;
 
+import com.google.inject.AbstractModule;
 
 /**
  *
@@ -60,6 +76,53 @@ public class Util {
         return pomIs;
     }
 
+    /**
+     * Creates a Plexus Container able to lookup the internal maven components using the maven ioC provider.
+     * Code was taken from MavenCLI
+     * @return The container.
+     * @throws PlexusContainerException On failures bootstrapping the iOC container.
+     * @see <a href="https://github.com/apache/maven/blob/master/maven-embedder/src/main/java/org/apache/maven/cli/MavenCli.java</a>
+     */
+    public static PlexusContainer createPlexusContainer() throws PlexusContainerException {
+        ClassWorld classWorld = new ClassWorld( "plexus.core", Thread.currentThread().getContextClassLoader() );
+          ILoggerFactory slf4jLoggerFactory = LoggerFactory.getILoggerFactory();
+        ClassRealm coreRealm = classWorld.getClassRealm( "plexus.core" );
+        if ( coreRealm == null )
+        {
+            coreRealm = classWorld.getRealms().iterator().next();
+        }
+
+        CoreExtensionEntry coreEntry = CoreExtensionEntry.discoverFrom( coreRealm );
+        // Here you should register your Galleon extensions
+        List<CoreExtensionEntry> extensions = Collections.emptyList();
+
+        ClassRealm containerRealm = coreRealm;
+
+          ContainerConfiguration cc = new DefaultContainerConfiguration().setClassWorld( classWorld)
+              .setRealm( containerRealm ).setClassPathScanning( PlexusConstants.SCANNING_INDEX ).setAutoWiring( true )
+              .setJSR250Lifecycle( true ).setName( "maven" );
+
+          Set<String> exportedArtifacts = new HashSet<>( coreEntry.getExportedArtifacts() );
+          Set<String> exportedPackages = new HashSet<>( coreEntry.getExportedPackages() );
+          for ( CoreExtensionEntry extension : extensions )
+          {
+              exportedArtifacts.addAll( extension.getExportedArtifacts() );
+              exportedPackages.addAll( extension.getExportedPackages() );
+          }
+
+          final CoreExports exports = new CoreExports( containerRealm, exportedArtifacts, exportedPackages );
+
+          DefaultPlexusContainer container = new DefaultPlexusContainer( cc, new AbstractModule()
+          {
+              @Override
+              protected void configure() {
+                  bind( ILoggerFactory.class ).toInstance( slf4jLoggerFactory );
+                  bind( CoreExports.class ).toInstance( exports );
+              }
+          } );
+          return  container;
+    }
+    
     public static RepositorySystemSession newRepositorySession(final RepositorySystem repoSystem,
             Path path, RepositoryListener listener, ProxySelector proxySelector, boolean offline) {
         final DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();
