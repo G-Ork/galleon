@@ -122,7 +122,7 @@ public class Util {
           } );
           return  container;
     }
-    
+
     public static RepositorySystemSession newRepositorySession(final RepositorySystem repoSystem,
             Path path, RepositoryListener listener, ProxySelector proxySelector, boolean offline) {
         final DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();

@@ -14,6 +14,7 @@ In order to remove the reference to the settings file call: _maven reset-setting
 NB: Advanced mirroring (eg: _external:*_) is not supported. + 
 NB: Any other cli maven configuration items will be overridden when a settings xml file is set. +
 NB: If no local repository is set in settings file, the local repository (default or configured) is used.
+NB: Any missing default repository will be added at runtime.  
 
 ### Adding new remote repositories
 Use the following command to add new remote repositories: +
@@ -41,6 +42,64 @@ NB: A reset command can be called for any of these changes to set the value back
 
 ### Advanced maven configuration
 Proxy, authentication and mirroring are only supported when setting a maven xml settings file.
+
+### Maven Mirrors
+If you like to use a maven artifact repository you have to configure a maven xml settings file.
+You need to configure all default repositories, a profile, at least one mirror and optional an server element 
+if your mirror needs authentication. You could use plaintext password or encrypt the password. 
+For further information to encrypt your password see: http://maven.apache.org/guides/mini/guide-encryption.html[Maven Password Encryption]  
+ 
+[settings.xml,xml]
+----
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+  <servers>
+    <server>
+      <id>maven-mirror</id>
+      <username>USERNAME</username>
+      <password>{ABCDEFGHIJKLMOPQRSTUVWXYZ=}</password>
+    </server>
+  </servers>
+
+  <mirrors>
+    <mirror>
+      <id>maven-mirror</id>
+      <url>https://host/repository/public-mirror/</url>
+      <mirrorOf>*</mirrorOf>
+    </mirror>
+  </mirrors>
+
+  <profiles>
+    <profile>
+      <id>mirror-profile</id>
+
+      <repositories>
+        <repository>
+          <id>maven-central</id>
+          <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+
+        <repository>
+          <id>jboss-public-repository-group</id>
+          <url>https://repository.jboss.org/nexus/content/groups/public/</url>
+        </repository>
+
+        <repository>
+          <id>jboss-ga </id>
+          <url>https://maven.repository.redhat.com/ga/</url>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+
+  <activeProfiles>
+    <activeProfile>mirror-profile</activeProfile>
+  </activeProfiles>
+</settings>
+----
 
 ### Local repository
 By default the local maven repository is located in _<user.home>/.m2/repository_. 

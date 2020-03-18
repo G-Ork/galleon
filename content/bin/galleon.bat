@@ -1,5 +1,5 @@
 @REM
-@REM Copyright 2016-2019 Red Hat, Inc. and/or its affiliates
+@REM Copyright 2016-2020 Red Hat, Inc. and/or its affiliates
 @REM and other contributors as indicated by the @author tags.
 @REM
 @REM Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,7 +52,7 @@ if "%MODULAR_JDK%" == "true" (
 )
 set "JAVA_OPTS=%JAVA_OPTS% %DEFAULT_MODULAR_JVM_OPTIONS%"
 
-"%JAVA%" %JAVA_OPTS% %LOGGING_CONFIG% -jar "%DIRNAME%\galleon-cli.jar" %*
+"%JAVA%" %JAVA_OPTS% %LOGGING_CONFIG% -cp "%DIRNAME%\..\lib\*" org.jboss.galleon.cli.CliMain %*
 :END
 if "x%NOPAUSE%" == "x" pause
 

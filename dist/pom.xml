@@ -34,6 +34,10 @@
   <packaging>pom</packaging>
 
   <dependencies>
+    <dependency>
+      <groupId>org.jboss.galleon</groupId>
+      <artifactId>galleon-cli</artifactId>
+    </dependency>
   </dependencies>
   
   <profiles>
